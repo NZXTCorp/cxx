@@ -43,6 +43,15 @@ public:
   String(const std::string &);
   String(const char *);
   String(const char *, std::size_t);
+  String(const char16_t *);
+  String(const char16_t *, std::size_t);
+
+  // Replace invalid Unicode data with the replacement character (U+FFFD).
+  static String lossy(const std::string &) noexcept;
+  static String lossy(const char *) noexcept;
+  static String lossy(const char *, std::size_t) noexcept;
+  static String lossy(const char16_t *) noexcept;
+  static String lossy(const char16_t *, std::size_t) noexcept;
 
   String &operator=(const String &) &noexcept;
   String &operator=(String &&) &noexcept;
@@ -56,6 +65,9 @@ public:
   bool empty() const noexcept;
 
   const char *c_str() noexcept;
+
+  std::size_t capacity() const noexcept;
+  void reserve(size_t new_cap) noexcept;
 
   using iterator = char *;
   iterator begin() noexcept;
@@ -80,6 +92,9 @@ public:
   String(unsafe_bitcopy_t, const String &) noexcept;
 
 private:
+  struct lossy_t;
+  String(lossy_t, const char *, std::size_t) noexcept;
+  String(lossy_t, const char16_t *, std::size_t) noexcept;
   friend void swap(String &lhs, String &rhs) noexcept { lhs.swap(rhs); }
 
   // Size and alignment statically verified by rust_string.rs.
@@ -319,6 +334,8 @@ public:
   void push_back(T &&value);
   template <typename... Args>
   void emplace_back(Args &&...args);
+  void truncate(std::size_t len);
+  void clear();
 
   using iterator = typename Slice<T>::iterator;
   iterator begin() noexcept;
@@ -336,7 +353,7 @@ public:
   Vec(unsafe_bitcopy_t, const Vec &) noexcept;
 
 private:
-  void reserve_total(std::size_t cap) noexcept;
+  void reserve_total(std::size_t new_cap) noexcept;
   void set_len(std::size_t len) noexcept;
   void drop() noexcept;
 
@@ -538,8 +555,8 @@ bool Slice<T>::empty() const noexcept {
 template <typename T>
 T &Slice<T>::operator[](std::size_t n) const noexcept {
   assert(n < this->size());
-  auto pos = static_cast<char *>(slicePtr(this)) + size_of<T>() * n;
-  return *reinterpret_cast<T *>(pos);
+  auto ptr = static_cast<char *>(slicePtr(this)) + size_of<T>() * n;
+  return *reinterpret_cast<T *>(ptr);
 }
 
 template <typename T>
@@ -577,8 +594,8 @@ Slice<T>::iterator::operator->() const noexcept {
 template <typename T>
 typename Slice<T>::iterator::reference Slice<T>::iterator::operator[](
     typename Slice<T>::iterator::difference_type n) const noexcept {
-  auto pos = static_cast<char *>(this->pos) + this->stride * n;
-  return *reinterpret_cast<T *>(pos);
+  auto ptr = static_cast<char *>(this->pos) + this->stride * n;
+  return *reinterpret_cast<T *>(ptr);
 }
 
 template <typename T>
@@ -937,6 +954,11 @@ void Vec<T>::emplace_back(Args &&...args) {
                                size * size_of<T>()))
       T(std::forward<Args>(args)...);
   this->set_len(size + 1);
+}
+
+template <typename T>
+void Vec<T>::clear() {
+  this->truncate(0);
 }
 
 template <typename T>

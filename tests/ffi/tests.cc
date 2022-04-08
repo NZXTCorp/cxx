@@ -110,6 +110,10 @@ rust::Slice<uint8_t> c_return_mutsliceu8(rust::Slice<uint8_t> slice) {
 
 rust::String c_return_rust_string() { return "2020"; }
 
+rust::String c_return_rust_string_lossy() {
+  return rust::String::lossy("Hello \xf0\x90\x80World");
+}
+
 std::unique_ptr<std::string> c_return_unique_ptr_string() {
   return std::unique_ptr<std::string>(new std::string("2020"));
 }
@@ -469,6 +473,23 @@ void c_take_rust_vec_shared_push(rust::Vec<Shared> v) {
   v.push_back(Shared{3});
   v.emplace_back(Shared{2});
   if (v[v.size() - 2].z == 3 && v.back().z == 2) {
+    cxx_test_suite_set_correct();
+  }
+}
+
+void c_take_rust_vec_shared_truncate(rust::Vec<Shared> v) {
+  v.truncate(1);
+  if (v.size() == 1) {
+    v.truncate(0);
+    if (v.size() == 0) {
+      cxx_test_suite_set_correct();
+    }
+  }
+}
+
+void c_take_rust_vec_shared_clear(rust::Vec<Shared> v) {
+  v.clear();
+  if (v.size() == 0) {
     cxx_test_suite_set_correct();
   }
 }
@@ -856,11 +877,29 @@ extern "C" const char *cxx_run_test() noexcept {
   ASSERT(cstring == "foo");
   ASSERT(other_cstring == "test");
 
+  ASSERT(cstring.capacity() == 3);
+  cstring.reserve(2);
+  ASSERT(cstring.capacity() == 3);
+  cstring.reserve(5);
+  ASSERT(cstring.capacity() >= 5);
+
   rust::Str cstr = "test";
   rust::Str other_cstr = "foo";
   swap(cstr, other_cstr);
   ASSERT(cstr == "foo");
   ASSERT(other_cstr == "test");
+
+  const char *utf8_literal = u8"Test string";
+  const char16_t *utf16_literal = u"Test string";
+  rust::String utf8_rstring = utf8_literal;
+  rust::String utf16_rstring = utf16_literal;
+  ASSERT(utf8_rstring == utf16_rstring);
+
+  const char *bad_utf8_literal = "test\x80";
+  const char16_t *bad_utf16_literal = u"test\xDD1E";
+  rust::String bad_utf8_rstring = rust::String::lossy(bad_utf8_literal);
+  rust::String bad_utf16_rstring = rust::String::lossy(bad_utf16_literal);
+  ASSERT(bad_utf8_rstring == bad_utf16_rstring);
 
   rust::Vec<int> vec1{1, 2};
   rust::Vec<int> vec2{3, 4};

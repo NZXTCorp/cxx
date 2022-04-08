@@ -84,6 +84,8 @@ struct Borrow {
   const std::string &s;
 };
 
+typedef char Buffer[12];
+
 size_t c_return_primitive();
 Shared c_return_shared();
 ::A::AShared c_return_ns_shared();
@@ -100,6 +102,7 @@ rust::Str c_return_str(const Shared &shared);
 rust::Slice<const char> c_return_slice_char(const Shared &shared);
 rust::Slice<uint8_t> c_return_mutsliceu8(rust::Slice<uint8_t> slice);
 rust::String c_return_rust_string();
+rust::String c_return_rust_string_lossy();
 std::unique_ptr<std::string> c_return_unique_ptr_string();
 std::unique_ptr<std::vector<uint8_t>> c_return_unique_ptr_vector_u8();
 std::unique_ptr<std::vector<double>> c_return_unique_ptr_vector_f64();
@@ -164,6 +167,8 @@ void c_take_rust_vec_nested_ns_shared(rust::Vec<::A::B::ABShared> v);
 void c_take_rust_vec_string(rust::Vec<rust::String> v);
 void c_take_rust_vec_shared_index(rust::Vec<Shared> v);
 void c_take_rust_vec_shared_push(rust::Vec<Shared> v);
+void c_take_rust_vec_shared_truncate(rust::Vec<Shared> v);
+void c_take_rust_vec_shared_clear(rust::Vec<Shared> v);
 void c_take_rust_vec_shared_forward_iterator(rust::Vec<Shared> v);
 void c_take_rust_vec_shared_sort(rust::Vec<Shared> v);
 void c_take_ref_rust_vec(const rust::Vec<uint8_t> &v);

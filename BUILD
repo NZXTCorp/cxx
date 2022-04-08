@@ -1,9 +1,13 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("//tools/bazel:rust.bzl", "rust_binary", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_proc_macro")
 
 rust_library(
     name = "cxx",
     srcs = glob(["src/**/*.rs"]),
+    crate_features = [
+        "alloc",
+        "std",
+    ],
     proc_macro_deps = [
         ":cxxbridge-macro",
     ],
@@ -39,10 +43,9 @@ cc_library(
     hdrs = ["include/cxx.h"],
 )
 
-rust_library(
+rust_proc_macro(
     name = "cxxbridge-macro",
     srcs = glob(["macro/src/**"]),
-    crate_type = "proc-macro",
     deps = [
         "//third-party:proc-macro2",
         "//third-party:quote",
@@ -58,7 +61,7 @@ rust_library(
     deps = [
         "//third-party:cc",
         "//third-party:codespan-reporting",
-        "//third-party:lazy_static",
+        "//third-party:once_cell",
         "//third-party:proc-macro2",
         "//third-party:quote",
         "//third-party:scratch",

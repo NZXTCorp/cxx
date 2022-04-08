@@ -22,6 +22,13 @@ std::size_t cxxbridge1$cxx_string$length(const std::string &s) noexcept {
   return s.length();
 }
 
+void cxxbridge1$cxx_string$clear(std::string &s) noexcept { s.clear(); }
+
+void cxxbridge1$cxx_string$reserve_total(std::string &s,
+                                         size_t new_cap) noexcept {
+  s.reserve(new_cap);
+}
+
 void cxxbridge1$cxx_string$push(std::string &s, const std::uint8_t *ptr,
                                 std::size_t len) noexcept {
   s.append(reinterpret_cast<const char *>(ptr), len);
@@ -31,12 +38,22 @@ void cxxbridge1$cxx_string$push(std::string &s, const std::uint8_t *ptr,
 void cxxbridge1$string$new(rust::String *self) noexcept;
 void cxxbridge1$string$clone(rust::String *self,
                              const rust::String &other) noexcept;
-bool cxxbridge1$string$from(rust::String *self, const char *ptr,
-                            std::size_t len) noexcept;
+bool cxxbridge1$string$from_utf8(rust::String *self, const char *ptr,
+                                 std::size_t len) noexcept;
+void cxxbridge1$string$from_utf8_lossy(rust::String *self, const char *ptr,
+                                       std::size_t len) noexcept;
+bool cxxbridge1$string$from_utf16(rust::String *self, const char16_t *ptr,
+                                  std::size_t len) noexcept;
+void cxxbridge1$string$from_utf16_lossy(rust::String *self, const char16_t *ptr,
+                                        std::size_t len) noexcept;
 void cxxbridge1$string$drop(rust::String *self) noexcept;
 const char *cxxbridge1$string$ptr(const rust::String *self) noexcept;
 std::size_t cxxbridge1$string$len(const rust::String *self) noexcept;
-void cxxbridge1$string$reserve_total(rust::String *self, size_t cap) noexcept;
+std::size_t cxxbridge1$string$capacity(const rust::String *self) noexcept;
+void cxxbridge1$string$reserve_additional(rust::String *self,
+                                          size_t additional) noexcept;
+void cxxbridge1$string$reserve_total(rust::String *self,
+                                     size_t new_cap) noexcept;
 
 // rust::Str
 void cxxbridge1$str$new(rust::Str *self) noexcept;
@@ -68,6 +85,12 @@ void panic [[noreturn]] (const char *msg) {
 
 template void panic<std::out_of_range> [[noreturn]] (const char *msg);
 
+template <typename T>
+static bool is_aligned(const void *ptr) noexcept {
+  auto iptr = reinterpret_cast<std::uintptr_t>(ptr);
+  return !(iptr % alignof(T));
+}
+
 String::String() noexcept { cxxbridge1$string$new(this); }
 
 String::String(const String &other) noexcept {
@@ -81,8 +104,14 @@ String::String(String &&other) noexcept : repr(other.repr) {
 String::~String() noexcept { cxxbridge1$string$drop(this); }
 
 static void initString(String *self, const char *s, std::size_t len) {
-  if (!cxxbridge1$string$from(self, s, len)) {
+  if (!cxxbridge1$string$from_utf8(self, s, len)) {
     panic<std::invalid_argument>("data for rust::String is not utf-8");
+  }
+}
+
+static void initString(String *self, const char16_t *s, std::size_t len) {
+  if (!cxxbridge1$string$from_utf16(self, s, len)) {
+    panic<std::invalid_argument>("data for rust::String is not utf-16");
   }
 }
 
@@ -98,6 +127,62 @@ String::String(const char *s, std::size_t len) {
   initString(this,
              s == nullptr && len == 0 ? reinterpret_cast<const char *>(1) : s,
              len);
+}
+
+String::String(const char16_t *s) {
+  assert(s != nullptr);
+  assert(is_aligned<char16_t>(s));
+  initString(this, s, std::char_traits<char16_t>::length(s));
+}
+
+String::String(const char16_t *s, std::size_t len) {
+  assert(s != nullptr || len == 0);
+  assert(is_aligned<char16_t>(s));
+  initString(this,
+             s == nullptr && len == 0 ? reinterpret_cast<const char16_t *>(2)
+                                      : s,
+             len);
+}
+
+struct String::lossy_t {};
+
+String::String(lossy_t, const char *s, std::size_t len) noexcept {
+  cxxbridge1$string$from_utf8_lossy(
+      this, s == nullptr && len == 0 ? reinterpret_cast<const char *>(1) : s,
+      len);
+}
+
+String::String(lossy_t, const char16_t *s, std::size_t len) noexcept {
+  cxxbridge1$string$from_utf16_lossy(
+      this,
+      s == nullptr && len == 0 ? reinterpret_cast<const char16_t *>(2) : s,
+      len);
+}
+
+String String::lossy(const std::string &s) noexcept {
+  return String::lossy(s.data(), s.length());
+}
+
+String String::lossy(const char *s) noexcept {
+  assert(s != nullptr);
+  return String::lossy(s, std::strlen(s));
+}
+
+String String::lossy(const char *s, std::size_t len) noexcept {
+  assert(s != nullptr || len == 0);
+  return String(lossy_t{}, s, len);
+}
+
+String String::lossy(const char16_t *s) noexcept {
+  assert(s != nullptr);
+  assert(is_aligned<char16_t>(s));
+  return String(lossy_t{}, s, std::char_traits<char16_t>::length(s));
+}
+
+String String::lossy(const char16_t *s, std::size_t len) noexcept {
+  assert(s != nullptr || len == 0);
+  assert(is_aligned<char16_t>(s));
+  return String(lossy_t{}, s, len);
 }
 
 String &String::operator=(const String &other) &noexcept {
@@ -135,10 +220,18 @@ bool String::empty() const noexcept { return this->size() == 0; }
 
 const char *String::c_str() noexcept {
   auto len = this->length();
-  cxxbridge1$string$reserve_total(this, len + 1);
+  cxxbridge1$string$reserve_additional(this, 1);
   auto ptr = this->data();
   const_cast<char *>(ptr)[len] = '\0';
   return ptr;
+}
+
+std::size_t String::capacity() const noexcept {
+  return cxxbridge1$string$capacity(this);
+}
+
+void String::reserve(std::size_t new_cap) noexcept {
+  cxxbridge1$string$reserve_total(this, new_cap);
 }
 
 String::iterator String::begin() noexcept {
@@ -526,9 +619,11 @@ static_assert(sizeof(std::string) <= kMaxExpectedWordsInString * sizeof(void *),
   const CXX_TYPE *cxxbridge1$rust_vec$##RUST_TYPE##$data(                      \
       const rust::Vec<CXX_TYPE> *ptr) noexcept;                                \
   void cxxbridge1$rust_vec$##RUST_TYPE##$reserve_total(                        \
-      rust::Vec<CXX_TYPE> *ptr, std::size_t cap) noexcept;                     \
+      rust::Vec<CXX_TYPE> *ptr, std::size_t new_cap) noexcept;                 \
   void cxxbridge1$rust_vec$##RUST_TYPE##$set_len(rust::Vec<CXX_TYPE> *ptr,     \
-                                                 std::size_t len) noexcept;
+                                                 std::size_t len) noexcept;    \
+  void cxxbridge1$rust_vec$##RUST_TYPE##$truncate(rust::Vec<CXX_TYPE> *ptr,    \
+                                                  std::size_t len) noexcept;
 
 #define RUST_VEC_OPS(RUST_TYPE, CXX_TYPE)                                      \
   template <>                                                                  \
@@ -552,12 +647,16 @@ static_assert(sizeof(std::string) <= kMaxExpectedWordsInString * sizeof(void *),
     return cxxbridge1$rust_vec$##RUST_TYPE##$data(this);                       \
   }                                                                            \
   template <>                                                                  \
-  void Vec<CXX_TYPE>::reserve_total(std::size_t cap) noexcept {                \
-    cxxbridge1$rust_vec$##RUST_TYPE##$reserve_total(this, cap);                \
+  void Vec<CXX_TYPE>::reserve_total(std::size_t new_cap) noexcept {            \
+    cxxbridge1$rust_vec$##RUST_TYPE##$reserve_total(this, new_cap);            \
   }                                                                            \
   template <>                                                                  \
   void Vec<CXX_TYPE>::set_len(std::size_t len) noexcept {                      \
     cxxbridge1$rust_vec$##RUST_TYPE##$set_len(this, len);                      \
+  }                                                                            \
+  template <>                                                                  \
+  void Vec<CXX_TYPE>::truncate(std::size_t len) {                              \
+    cxxbridge1$rust_vec$##RUST_TYPE##$truncate(this, len);                     \
   }
 
 #define SHARED_PTR_OPS(RUST_TYPE, CXX_TYPE)                                    \

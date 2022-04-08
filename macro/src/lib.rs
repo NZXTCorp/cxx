@@ -3,7 +3,7 @@
     clippy::default_trait_access,
     clippy::doc_markdown,
     clippy::enum_glob_use,
-    clippy::filter_map,
+    clippy::if_same_then_else,
     clippy::inherent_to_string,
     clippy::items_after_statements,
     clippy::large_enum_variant,
@@ -34,11 +34,12 @@ mod derive;
 mod expand;
 mod generics;
 mod syntax;
+mod tokens;
 mod type_id;
 
-#[cfg(feature = "experimental")]
+#[cfg(feature = "experimental-enum-variants-from-header")]
 mod clang;
-#[cfg(feature = "experimental")]
+#[cfg(feature = "experimental-enum-variants-from-header")]
 mod load;
 
 use crate::syntax::file::Module;

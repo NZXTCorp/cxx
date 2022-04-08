@@ -51,6 +51,7 @@
     clippy::doc_markdown,
     clippy::drop_copy,
     clippy::enum_glob_use,
+    clippy::if_same_then_else,
     clippy::inherent_to_string,
     clippy::items_after_statements,
     clippy::let_underscore_drop,
@@ -77,6 +78,7 @@
     clippy::wrong_self_convention
 )]
 
+mod cargo;
 mod cfg;
 mod deps;
 mod error;
@@ -88,6 +90,7 @@ mod syntax;
 mod target;
 mod vec;
 
+use crate::cargo::CargoEnvCfgEvaluator;
 use crate::deps::{Crate, HeaderDir};
 use crate::error::{Error, Result};
 use crate::gen::error::report;
@@ -392,6 +395,7 @@ fn make_include_dir(prj: &Project) -> Result<PathBuf> {
 fn generate_bridge(prj: &Project, build: &mut Build, rust_source_file: &Path) -> Result<()> {
     let opt = Opt {
         allow_dot_includes: false,
+        cfg_evaluator: Box::new(CargoEnvCfgEvaluator),
         ..Opt::default()
     };
     let generated = gen::generate_from_path(rust_source_file, &opt);

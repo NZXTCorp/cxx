@@ -9,7 +9,6 @@ use syn::punctuated::Punctuated;
 #[derive(Clone)]
 pub struct ForeignName {
     text: String,
-    span: Span,
 }
 
 impl Pair {
@@ -20,17 +19,6 @@ impl Pair {
             .map(|ident| ident as &dyn Segment)
             .chain(iter::once(&self.cxx as &dyn Segment));
         Symbol::from_idents(segments)
-    }
-
-    pub fn to_fully_qualified(&self) -> String {
-        let mut fully_qualified = String::new();
-        for segment in &self.namespace {
-            fully_qualified += "::";
-            fully_qualified += &segment.to_string();
-        }
-        fully_qualified += "::";
-        fully_qualified += &self.cxx.to_string();
-        fully_qualified
     }
 }
 
@@ -56,7 +44,7 @@ impl ForeignName {
         match syn::parse_str::<Ident>(text) {
             Ok(ident) => {
                 let text = ident.to_string();
-                Ok(ForeignName { text, span })
+                Ok(ForeignName { text })
             }
             Err(err) => Err(Error::new(span, err)),
         }

@@ -180,6 +180,7 @@ impl Discriminant {
         }
     }
 
+    #[cfg(feature = "experimental-enum-variants-from-header")]
     pub const fn checked_succ(self) -> Option<Self> {
         match self.sign {
             Sign::Negative => {
@@ -208,7 +209,7 @@ impl Display for Discriminant {
         if self.sign == Sign::Negative {
             f.write_str("-")?;
         }
-        Display::fmt(&self.magnitude, f)
+        write!(f, "{}", self.magnitude)
     }
 }
 

@@ -1,3 +1,4 @@
+#![cfg(feature = "alloc")]
 #![allow(missing_docs)]
 
 use crate::rust_string::RustString;
@@ -56,16 +57,20 @@ impl<T> RustVec<T> {
         self.as_vec().as_ptr()
     }
 
-    pub fn reserve_total(&mut self, cap: usize) {
+    pub fn reserve_total(&mut self, new_cap: usize) {
         let vec = self.as_mut_vec();
-        let len = vec.len();
-        if cap > len {
-            vec.reserve(cap - len);
+        if new_cap > vec.capacity() {
+            let additional = new_cap - vec.len();
+            vec.reserve(additional);
         }
     }
 
     pub unsafe fn set_len(&mut self, len: usize) {
-        self.as_mut_vec().set_len(len);
+        unsafe { self.as_mut_vec().set_len(len) }
+    }
+
+    pub fn truncate(&mut self, len: usize) {
+        self.as_mut_vec().truncate(len);
     }
 }
 

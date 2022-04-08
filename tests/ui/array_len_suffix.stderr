@@ -1,5 +1,5 @@
 error[E0308]: mismatched types
- --> $DIR/array_len_suffix.rs:4:32
+ --> tests/ui/array_len_suffix.rs:4:32
   |
 4 |         fn array() -> [String; 12u16];
   |                                ^^^^^ expected `usize`, found `u16`
@@ -7,4 +7,4 @@ error[E0308]: mismatched types
 help: change the type of the numeric literal from `u16` to `usize`
   |
 4 |         fn array() -> [String; 12usize];
-  |                                ^^^^^^^
+  |                                  ~~~~~

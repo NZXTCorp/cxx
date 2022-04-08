@@ -15,7 +15,7 @@
 pub mod cast;
 pub mod module;
 
-use cxx::{CxxString, CxxVector, SharedPtr, UniquePtr};
+use cxx::{type_id, CxxString, CxxVector, ExternType, SharedPtr, UniquePtr};
 use std::fmt::{self, Display};
 use std::mem::MaybeUninit;
 use std::os::raw::c_char;
@@ -80,6 +80,7 @@ pub mod ffi {
 
     pub struct Array {
         a: [i32; 4],
+        b: Buffer,
     }
 
     #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -103,6 +104,7 @@ pub mod ffi {
         fn c_return_slice_char(shared: &Shared) -> &[c_char];
         fn c_return_mutsliceu8(slice: &mut [u8]) -> &mut [u8];
         fn c_return_rust_string() -> String;
+        fn c_return_rust_string_lossy() -> String;
         fn c_return_unique_ptr_string() -> UniquePtr<CxxString>;
         fn c_return_unique_ptr_vector_u8() -> UniquePtr<CxxVector<u8>>;
         fn c_return_unique_ptr_vector_f64() -> UniquePtr<CxxVector<f64>>;
@@ -161,6 +163,8 @@ pub mod ffi {
         fn c_take_rust_vec_index(v: Vec<u8>);
         fn c_take_rust_vec_shared_index(v: Vec<Shared>);
         fn c_take_rust_vec_shared_push(v: Vec<Shared>);
+        fn c_take_rust_vec_shared_truncate(v: Vec<Shared>);
+        fn c_take_rust_vec_shared_clear(v: Vec<Shared>);
         fn c_take_rust_vec_shared_forward_iterator(v: Vec<Shared>);
         fn c_take_rust_vec_shared_sort(v: Vec<Shared>);
         fn c_take_ref_rust_vec(v: &Vec<u8>);
@@ -255,6 +259,10 @@ pub mod ffi {
         CVal1,
         #[cxx_name = "CVAL2"]
         CVal2,
+    }
+
+    extern "C++" {
+        type Buffer = crate::Buffer;
     }
 
     extern "Rust" {
@@ -419,6 +427,15 @@ impl ffi::Array {
     pub fn r_get_array_sum(&self) -> i32 {
         self.a.iter().sum()
     }
+}
+
+#[derive(Default)]
+#[repr(C)]
+pub struct Buffer([c_char; 12]);
+
+unsafe impl ExternType for Buffer {
+    type Id = type_id!("tests::Buffer");
+    type Kind = cxx::kind::Trivial;
 }
 
 #[derive(Debug)]
